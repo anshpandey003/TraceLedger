@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: traceledger-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: traceledger
+      POSTGRES_PASSWORD: traceledger
+      POSTGRES_DB: traceledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - traceledger_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  traceledger_postgres_data:
