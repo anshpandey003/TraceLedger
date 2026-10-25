@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
+from backend.app.retrieval.postgres import PostgreSQLEvidenceRetriever
+from backend.app.services.gemini_verifier import GeminiVerifier
 from backend.app.services.investigation_service import InvestigationService
 
 
 router = APIRouter(
     prefix="/investigations",
-    tags=["investigations"],
+    tags=["investigation-runs"],
 )
 
 
@@ -20,8 +22,15 @@ router = APIRouter(
 def run_investigation(
     investigation_id: UUID,
     db: Session = Depends(get_db),
-) -> dict:
-    service = InvestigationService(db)
+) -> dict[str, str]:
+    verifier = GeminiVerifier()
+    retriever = PostgreSQLEvidenceRetriever(db)
+
+    service = InvestigationService(
+        db=db,
+        verifier=verifier,
+        retriever=retriever,
+    )
 
     try:
         investigation = service.run(investigation_id)
@@ -32,7 +41,7 @@ def run_investigation(
         ) from exc
 
     return {
-        "id": investigation.id,
-        "status": investigation.status,
-        "message": "Investigation completed",
+        "id": str(investigation.id),
+        "status": investigation.status.value,
+        "message": "Investigation completed successfully.",
     }

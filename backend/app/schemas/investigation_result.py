@@ -1,19 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from backend.app.core.enums import Verdict
 
 
 class InvestigationResultCreate(BaseModel):
     verdict: Verdict
-    explanation: str = Field(min_length=1)
-    confidence: float | None = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-    )
+    explanation: str
+    confidence: float
 
 
 class InvestigationResultResponse(BaseModel):
@@ -23,6 +19,5 @@ class InvestigationResultResponse(BaseModel):
     claim_id: UUID
     verdict: Verdict
     explanation: str
-    confidence: float | None
+    confidence: float
     created_at: datetime
-    updated_at: datetime

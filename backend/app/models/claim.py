@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
+from backend.app.core.time import utc_now
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
@@ -44,7 +45,7 @@ class Claim(Base):
     as_of: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=utc_now,
     )
 
     status: Mapped[ClaimStatus] = mapped_column(

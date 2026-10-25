@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.enums import ClaimStatus
 from backend.app.db.session import get_db
 from backend.app.models.claim import Claim
+from backend.app.models.investigation import Investigation
 from backend.app.schemas.claim import ClaimCreate, ClaimResponse
 
 
@@ -26,6 +27,18 @@ def create_claim(
     payload: ClaimCreate,
     db: Session = Depends(get_db),
 ) -> ClaimResponse:
+    investigation = db.scalar(
+        select(Investigation).where(
+            Investigation.id == investigation_id,
+        )
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
     claim = Claim(
         investigation_id=investigation_id,
         text=payload.text,

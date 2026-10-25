@@ -1,6 +1,9 @@
 from datetime import datetime
+
+from backend.app.core.time import utc_now
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
+from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
@@ -48,14 +51,14 @@ class Investigation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=utc_now,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     claims: Mapped[list["Claim"]] = relationship(

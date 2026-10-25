@@ -1,11 +1,14 @@
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.core.time import utc_now
 from backend.app.db.base import Base
 
 
@@ -54,6 +57,11 @@ class Evidence(Base):
         nullable=True,
     )
 
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(768),
+        nullable=True,
+    )
+
     observed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -62,7 +70,7 @@ class Evidence(Base):
     retrieved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=utc_now,
     )
 
     authority: Mapped[str | None] = mapped_column(

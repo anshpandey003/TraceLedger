@@ -3,116 +3,220 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.core.enums import ClaimStatus, InvestigationStatus, Verdict
+from backend.app.core.enums import ClaimStatus, InvestigationStatus
 from backend.app.models.claim import Claim
-from backend.app.models.evidence import Evidence
+from backend.app.models.contradiction import Contradiction
+from backend.app.models.evidence_analysis import EvidenceAnalysis
 from backend.app.models.investigation import Investigation
 from backend.app.models.investigation_result import InvestigationResult
 from backend.app.models.result_citation import ResultCitation
+from backend.app.retrieval.postgres import PostgreSQLEvidenceRetriever
+from backend.app.services.evidence_verifier import EvidenceVerifier
+from backend.app.services.investigation_analysis import (
+    InvestigationAnalysis,
+)
+from backend.app.services.investigation_analysis import (
+    InvestigationAnalysisService,
+)
+from backend.app.services.verification_validator import VerificationValidator
 
 
 class InvestigationService:
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        verifier: EvidenceVerifier,
+        retriever: PostgreSQLEvidenceRetriever,
+        analysis_service: InvestigationAnalysisService | None = None,
+    ) -> None:
         self.db = db
+        self.verifier = verifier
+        self.retriever = retriever
+        self.analysis_service = (
+            analysis_service or InvestigationAnalysisService()
+        )
 
     def run(self, investigation_id: UUID) -> Investigation:
-        investigation = self.db.get(Investigation, investigation_id)
+        investigation = self.db.get(
+            Investigation,
+            investigation_id,
+        )
 
         if investigation is None:
             raise ValueError("Investigation not found")
 
         investigation.status = InvestigationStatus.RUNNING
+        self.db.flush()
 
-        claims = list(
-            self.db.scalars(
-                select(Claim)
-                .where(Claim.investigation_id == investigation_id)
-                .order_by(Claim.created_at.asc())
-            ).all()
-        )
+        try:
+            claims = list(
+                self.db.scalars(
+                    select(Claim)
+                    .where(
+                        Claim.investigation_id == investigation_id
+                    )
+                    .order_by(Claim.created_at)
+                ).all()
+            )
 
-        for claim in claims:
-            self._process_claim(claim)
+            for claim in claims:
+                self._process_claim(claim)
 
-        investigation.status = InvestigationStatus.COMPLETED
+            investigation.status = InvestigationStatus.COMPLETED
 
-        self.db.commit()
-        self.db.refresh(investigation)
+            self.db.commit()
+            self.db.refresh(investigation)
 
-        return investigation
+            return investigation
 
-    def _process_claim(self, claim: Claim) -> None:
+        except Exception:
+            self.db.rollback()
+
+            investigation = self.db.get(
+                Investigation,
+                investigation_id,
+            )
+
+            if investigation is not None:
+                investigation.status = InvestigationStatus.FAILED
+                self.db.commit()
+                self.db.refresh(investigation)
+
+            raise
+
+    def _process_claim(
+        self,
+        claim: Claim,
+    ) -> None:
         claim.status = ClaimStatus.INVESTIGATING
 
-        existing_result = self.db.scalars(
-            select(InvestigationResult).where(
+        existing_result = self.db.scalar(
+            select(InvestigationResult)
+            .where(
                 InvestigationResult.claim_id == claim.id
             )
-        ).first()
+        )
 
         if existing_result is not None:
             claim.status = ClaimStatus.COMPLETED
             return
 
-        evidence = list(
-            self.db.scalars(
-                select(Evidence)
-                .where(Evidence.claim_id == claim.id)
-                .order_by(Evidence.created_at.asc())
-            ).all()
+        retrieval_results = self.retriever.retrieve_hybrid(
+            claim_id=claim.id,
+            query=claim.text,
+            as_of=claim.as_of,
+            limit=10,
         )
+
+        evidence = [
+            result.evidence
+            for result in retrieval_results
+        ]
 
         if not evidence:
             claim.status = ClaimStatus.COMPLETED
 
             result = InvestigationResult(
                 claim_id=claim.id,
-                verdict=Verdict.INCONCLUSIVE,
-                explanation="No evidence is available for this claim.",
+                verdict="inconclusive",
+                explanation=(
+                    "No relevant evidence is available for "
+                    "this claim at the specified point in time."
+                ),
                 confidence=0.0,
             )
 
             self.db.add(result)
+
             return
 
-        result = self._evaluate_claim(claim, evidence)
+        analysis = self.analysis_service.analyze(
+            evidence,
+            as_of=claim.as_of,
+        )
+
+        decision = self.verifier.verify(
+            claim=claim,
+            evidence=evidence,
+        )
+
+        decision = VerificationValidator.validate(
+            decision=decision,
+            evidence=evidence,
+        )
+
+        result = InvestigationResult(
+            claim_id=claim.id,
+            verdict=decision.verdict,
+            explanation=decision.explanation,
+            confidence=decision.confidence,
+        )
 
         self.db.add(result)
         self.db.flush()
 
-        for evidence_item in evidence:
-            citation = ResultCitation(
-                result_id=result.id,
-                evidence_id=evidence_item.id,
-            )
+        self._persist_analysis(
+            result=result,
+            analysis=analysis,
+        )
 
-            self.db.add(citation)
+        cited_evidence_ids = set(
+            decision.evidence_ids
+        )
+
+        for evidence_item in evidence:
+            if evidence_item.id in cited_evidence_ids:
+                self.db.add(
+                    ResultCitation(
+                        result_id=result.id,
+                        evidence_id=evidence_item.id,
+                    )
+                )
 
         claim.status = ClaimStatus.COMPLETED
 
-    def _evaluate_claim(
+    def _persist_analysis(
         self,
-        claim: Claim,
-        evidence: list[Evidence],
-    ) -> InvestigationResult:
-        for evidence_item in evidence:
-            if "₹25,000" in evidence_item.content and "₹50,000" in claim.text:
-                return InvestigationResult(
-                    claim_id=claim.id,
-                    verdict=Verdict.CONTRADICTED,
-                    explanation=(
-                        "The available evidence contradicts the claimed "
-                        "refund limit."
-                    ),
-                    confidence=0.95,
-                )
+        result: InvestigationResult,
+        analysis: InvestigationAnalysis,
+    ) -> None:
+        for evidence_analysis in analysis.evidence_analysis:
+            quality = evidence_analysis.quality
 
-        return InvestigationResult(
-            claim_id=claim.id,
-            verdict=Verdict.INCONCLUSIVE,
-            explanation=(
-                "Evidence was found, but the current deterministic "
-                "evaluation could not establish support or contradiction."
-            ),
-            confidence=0.40,
-        )
+            self.db.add(
+                EvidenceAnalysis(
+                    result_id=result.id,
+                    evidence_id=evidence_analysis.evidence_id,
+                    authority_score=quality.authority_score,
+                    freshness_score=quality.freshness_score,
+                    temporal_valid=quality.temporal_valid,
+                    completeness_score=quality.completeness_score,
+                )
+            )
+
+        for contradiction in analysis.contradictions:
+            self.db.add(
+                Contradiction(
+                    result_id=result.id,
+                    evidence_a_id=contradiction.evidence_a_id,
+                    evidence_b_id=contradiction.evidence_b_id,
+                    conflict_type=contradiction.conflict_type,
+                    values_a=[
+                        self._serialize_assertion(value)
+                        for value in contradiction.values_a
+                    ],
+                    values_b=[
+                        self._serialize_assertion(value)
+                        for value in contradiction.values_b
+                    ],
+                )
+            )
+
+    @staticmethod
+    def _serialize_assertion(assertion) -> dict:
+        return {
+            "assertion_type": assertion.assertion_type,
+            "raw_text": assertion.fact.raw_text,
+            "value": assertion.fact.value,
+            "unit": assertion.fact.unit,
+        }
