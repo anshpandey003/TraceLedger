@@ -1,15 +1,34 @@
-from backend.app.services.fact_normalizer import FactNormalizer
+﻿from backend.app.services.fact_normalizer import FactNormalizer
 
 
 def test_normalizes_inr_currency_with_commas():
+    text = "The maximum refund amount is \u20b925,000."
+    facts = FactNormalizer().extract_numeric_facts(text)
+
+    assert len(facts) == 1
+    assert facts[0].value == 25000.0
+    assert facts[0].unit == "INR"
+    assert facts[0].raw_text == "\u20b925,000"
+
+
+def test_normalizes_inr_currency_code_before_number():
     facts = FactNormalizer().extract_numeric_facts(
-        "The maximum refund amount is ₹25,000."
+        "The maximum refund amount is INR 25,000."
     )
 
     assert len(facts) == 1
     assert facts[0].value == 25000.0
     assert facts[0].unit == "INR"
-    assert facts[0].raw_text == "₹25,000"
+
+
+def test_normalizes_inr_currency_code_after_number():
+    facts = FactNormalizer().extract_numeric_facts(
+        "The maximum refund amount is 25,000 INR."
+    )
+
+    assert len(facts) == 1
+    assert facts[0].value == 25000.0
+    assert facts[0].unit == "INR"
 
 
 def test_normalizes_usd_currency_with_commas():
@@ -23,9 +42,8 @@ def test_normalizes_usd_currency_with_commas():
 
 
 def test_normalizes_eur_currency_with_commas():
-    facts = FactNormalizer().extract_numeric_facts(
-        "The maximum refund amount is €25,000."
-    )
+    text = "The maximum refund amount is \u20ac25,000."
+    facts = FactNormalizer().extract_numeric_facts(text)
 
     assert len(facts) == 1
     assert facts[0].value == 25000.0
@@ -33,9 +51,8 @@ def test_normalizes_eur_currency_with_commas():
 
 
 def test_normalizes_gbp_currency_with_commas():
-    facts = FactNormalizer().extract_numeric_facts(
-        "The maximum refund amount is £25,000."
-    )
+    text = "The maximum refund amount is \u00a325,000."
+    facts = FactNormalizer().extract_numeric_facts(text)
 
     assert len(facts) == 1
     assert facts[0].value == 25000.0
@@ -73,9 +90,8 @@ def test_normalizes_storage_units():
 
 
 def test_extracts_multiple_numeric_facts():
-    facts = FactNormalizer().extract_numeric_facts(
-        "Refunds range from ₹10,000 to ₹25,000."
-    )
+    text = "Refunds range from \u20b910,000 to \u20b925,000."
+    facts = FactNormalizer().extract_numeric_facts(text)
 
     assert len(facts) == 2
     assert facts[0].value == 10000.0

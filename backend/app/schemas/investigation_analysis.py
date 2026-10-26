@@ -62,6 +62,7 @@ class ContradictionResponse(BaseModel):
         type_a = assertion_a.assertion_type.replace("_", " ")
         type_b = assertion_b.assertion_type.replace("_", " ")
 
+
         if assertion_a.unit and assertion_b.unit:
             if assertion_a.unit != assertion_b.unit:
                 return (
@@ -73,11 +74,20 @@ class ContradictionResponse(BaseModel):
             unit_context = (
                 f" Both use the same unit ({assertion_a.unit})."
             )
-        else:
+        elif assertion_a.unit is None and assertion_b.unit is None:
             unit_context = (
-                " At least one assertion has no explicit unit, so "
-                "the values cannot be confirmed as directly comparable."
+                " Neither assertion records an explicit unit, "
+                "so comparability cannot be confirmed from the "
+                "stored assertions alone."
             )
+        else:
+            known_unit = assertion_a.unit or assertion_b.unit
+            unit_context = (
+                f" One assertion records the unit {known_unit}, "
+                "but the other does not, so comparability cannot "
+                "be confirmed from the stored assertions alone."
+            )
+
 
         if type_a != type_b:
             return (

@@ -134,7 +134,7 @@ def test_numeric_contradiction_has_readable_explanation():
 
     assert contradiction.explanation == (
         "Both evidence items state a maximum, but one reports "
-        "₹25,000 and the other reports ₹50,000. "
+        "\u20b925,000 and the other reports \u20b950,000. "
         "Both use the same unit (INR). Review the cited evidence "
         "to establish which value is correct."
     )
@@ -161,8 +161,57 @@ def test_contradiction_explanation_warns_about_different_units():
     )
 
     assert "their units differ" in contradiction.explanation
-    assert "₹25,000" in contradiction.explanation
+    assert "\u20b925,000" in contradiction.explanation
     assert "$50,000" in contradiction.explanation
+
+
+def test_contradiction_explanation_warns_when_both_units_are_missing():
+    contradiction = build_contradiction_response(
+        values_a=[
+            {
+                "assertion_type": "maximum",
+                "raw_text": "Maximum is 25000",
+                "value": 25000,
+                "unit": None,
+            }
+        ],
+        values_b=[
+            {
+                "assertion_type": "maximum",
+                "raw_text": "Maximum is 50000",
+                "value": 50000,
+                "unit": None,
+            }
+        ],
+    )
+
+    assert "Neither assertion records an explicit unit" in (
+        contradiction.explanation
+    )
+
+
+def test_contradiction_explanation_warns_when_one_unit_is_missing():
+    contradiction = build_contradiction_response(
+        values_a=[
+            {
+                "assertion_type": "maximum",
+                "raw_text": "Maximum is 25000 INR",
+                "value": 25000,
+                "unit": "INR",
+            }
+        ],
+        values_b=[
+            {
+                "assertion_type": "maximum",
+                "raw_text": "Maximum is 50000",
+                "value": 50000,
+                "unit": None,
+            }
+        ],
+    )
+
+    assert "One assertion records the unit INR" in contradiction.explanation
+    assert "the other does not" in contradiction.explanation
 
 
 def test_contradiction_explanation_handles_missing_assertions():
@@ -194,4 +243,4 @@ def test_explanation_is_in_serialized_response():
     serialized = contradiction.model_dump(mode="json")
 
     assert "explanation" in serialized
-    assert "₹25,000" in serialized["explanation"]
+    assert "\u20b925,000" in serialized["explanation"]

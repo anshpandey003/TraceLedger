@@ -1,3 +1,4 @@
+
 import re
 from dataclasses import dataclass
 
@@ -10,23 +11,21 @@ class NumericFact:
 
 
 class FactNormalizer:
+    CURRENCY_PATTERN = (
+        r"₹|\$|€|£|\bINR\b|\bUSD\b|\bEUR\b|\bGBP\b"
+    )
+
     NUMBER_PATTERN = re.compile(
-        r"""
-        (?P<currency>₹|\$|€|£)?
+        rf"""
+        (?P<currency_before>{CURRENCY_PATTERN})?
         \s*
         (?P<number>
-            \d+(?:,\d{3})*(?:\.\d+)?
-            |
-            \d+\.\d+
+            \d+(?:,\d{{3}})*(?:\.\d+)?
         )
         \s*
-        (?P<unit>
-            %|
-            mb|
-            gb|
-            kb|
-            tb
-        )?
+        (?P<unit>%|mb|gb|kb|tb)?
+        \s*
+        (?P<currency_after>{CURRENCY_PATTERN})?
         """,
         re.IGNORECASE | re.VERBOSE,
     )
@@ -36,6 +35,10 @@ class FactNormalizer:
         "$": "USD",
         "€": "EUR",
         "£": "GBP",
+        "INR": "INR",
+        "USD": "USD",
+        "EUR": "EUR",
+        "GBP": "GBP",
     }
 
     def extract_numeric_facts(
@@ -46,28 +49,32 @@ class FactNormalizer:
 
         for match in self.NUMBER_PATTERN.finditer(text):
             number_text = match.group("number")
-            currency = match.group("currency")
+            currency = (
+                match.group("currency_before")
+                or match.group("currency_after")
+            )
             unit = match.group("unit")
 
             value = float(number_text.replace(",", ""))
 
             if currency:
-                normalized_unit = self.CURRENCY_UNITS[currency]
+                normalized_unit = self.CURRENCY_UNITS[
+                    currency.upper()
+                    if currency.isascii()
+                    else currency
+                ]
             elif unit:
                 normalized_unit = unit.lower()
-
                 if normalized_unit == "%":
                     normalized_unit = "percent"
             else:
                 normalized_unit = None
 
-            raw_text = match.group(0).strip()
-
             facts.append(
                 NumericFact(
                     value=value,
                     unit=normalized_unit,
-                    raw_text=raw_text,
+                    raw_text=match.group(0).strip(),
                 )
             )
 
