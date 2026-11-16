@@ -990,3 +990,136 @@ a {
     text-align: left;
   }
 }
+
+
+/* =========================================================
+   TRACELEDGER GLOBAL THEME
+   ========================================================= */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --brand: #204438;
+  --brand-light: #315c4d;
+  --foreground: #17231f;
+  --muted: #68756e;
+  --background: #f5f3ed;
+  --surface: #fffdfa;
+  --surface-subtle: #f0eee7;
+  --border: #dedbd1;
+  --shadow-sm: 0 2px 8px rgba(31, 48, 40, 0.04);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --brand: #315c4d;
+  --brand-light: #4d806b;
+  --foreground: #eeeae0;
+  --muted: #a6b1a8;
+  --background: #111a16;
+  --surface: #19251f;
+  --surface-subtle: #202e26;
+  --border: #35463b;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.14);
+
+  --supported: #8bc5a1;
+  --supported-soft: #203b2b;
+  --contradicted: #ed9b93;
+  --contradicted-soft: #432724;
+  --inconclusive: #e2c17c;
+  --inconclusive-soft: #403721;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.panel,
+.metric-card,
+.claim-card,
+.evidence-card,
+.investigation-detail-grid,
+.claim-result,
+.new-investigation-card,
+.new-investigation-aside {
+  background-color: var(--surface);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+input,
+textarea,
+select {
+  background-color: var(--surface);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+
+.sidebar {
+  background-color: var(--brand);
+}
+
+.secondary-button {
+  background-color: var(--surface);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .new-investigation-page {
+  --ni-accent: #78b49a;
+  --ni-text: #eeeae0;
+  --ni-muted: #a6b1a8;
+  --ni-border: #35463b;
+}
+
+:root[data-theme="dark"] .new-investigation-submit {
+  background: #315c4d;
+  border-color: #4d806b;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .new-investigation-icon,
+:root[data-theme="dark"] .new-investigation-aside-mark {
+  background: #243a2e;
+  border-color: #3a5c48;
+  color: #a4d4b7;
+}
+
+:root[data-theme="dark"] .new-investigation-field input,
+:root[data-theme="dark"] .new-investigation-field textarea {
+  background: #121c17;
+  color: #eeeae0;
+  border-color: #35463b;
+}
+
+:root[data-theme="dark"] .new-investigation-step-count,
+:root[data-theme="dark"] .new-investigation-aside-number {
+  background: #19251f;
+  border-color: #35463b;
+}
+
+:root[data-theme="dark"] .new-investigation-note {
+  background: #202e26;
+  border-color: #35463b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+}

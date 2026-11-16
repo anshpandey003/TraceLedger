@@ -11,6 +11,9 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "langgraph>=1.0,<2",
     "alembic>=1.20,<2",
+    "google-genai>=3.0,<4",
+    "langchain-core>=1.8,<2",
+    "langchain-google-genai>=4.5,<5",
 ]
 
 [build-system]
@@ -21,3 +24,4 @@ build-backend = "setuptools.build_meta"
 markers = [
     "gemini: tests that call the real Gemini API",
 ]
+addopts = "-m 'not gemini'"

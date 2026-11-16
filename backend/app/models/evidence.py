@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -63,6 +62,16 @@ class Evidence(Base):
     )
 
     observed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    valid_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    valid_to: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

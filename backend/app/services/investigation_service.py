@@ -2,14 +2,16 @@
 from typing import TypedDict
 from uuid import UUID
 
-from langgraph.graph import END, START, StateGraph
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from langgraph.graph import END, START, StateGraph
 
 from backend.app.core.enums import ClaimStatus, InvestigationStatus
 from backend.app.models.claim import Claim
 from backend.app.models.contradiction import Contradiction
 from backend.app.models.evidence_analysis import EvidenceAnalysis
+from backend.app.models.evidence import Evidence
 from backend.app.models.investigation import Investigation
 from backend.app.models.investigation_result import InvestigationResult
 from backend.app.models.result_citation import ResultCitation
@@ -19,15 +21,17 @@ from backend.app.services.investigation_analysis import (
     InvestigationAnalysis,
     InvestigationAnalysisService,
 )
+from backend.app.services.query_rewriter import QueryRewriter
 from backend.app.services.verification_validator import VerificationValidator
 
 
 class ClaimWorkflowState(TypedDict, total=False):
     claim: Claim
-    evidence: list
+    evidence: list[Evidence]
     analysis: InvestigationAnalysis
     decision: object
     result: InvestigationResult
+    search_query: str
 
 
 class InvestigationService:
@@ -37,35 +41,56 @@ class InvestigationService:
         verifier: EvidenceVerifier,
         retriever: PostgreSQLEvidenceRetriever,
         analysis_service: InvestigationAnalysisService | None = None,
+        query_rewriter: QueryRewriter | None = None,
     ) -> None:
         self.db = db
         self.verifier = verifier
         self.retriever = retriever
+
         self.analysis_service = (
             analysis_service or InvestigationAnalysisService()
         )
+
+        self.query_rewriter = query_rewriter or QueryRewriter()
+
         self.graph = self._build_graph()
 
     def _build_graph(self):
         workflow = StateGraph(ClaimWorkflowState)
 
         workflow.add_node("retrieve", self._retrieve_evidence)
+        workflow.add_node("rewrite_query", self._rewrite_query)
+        workflow.add_node("retrieve_retry", self._retrieve_evidence)
         workflow.add_node("analyze", self._analyze_evidence)
         workflow.add_node("verify", self._verify_claim)
         workflow.add_node("persist_result", self._persist_result)
         workflow.add_node("persist_inconclusive", self._persist_inconclusive)
 
         workflow.add_edge(START, "retrieve")
+
         workflow.add_conditional_edges(
             "retrieve",
             self._route_after_retrieval,
             {
                 "analyze": "analyze",
+                "rewrite_query": "rewrite_query",
+            },
+        )
+
+        workflow.add_edge("rewrite_query", "retrieve_retry")
+
+        workflow.add_conditional_edges(
+            "retrieve_retry",
+            self._route_after_retry,
+            {
+                "analyze": "analyze",
                 "persist_inconclusive": "persist_inconclusive",
             },
         )
+
         workflow.add_edge("analyze", "verify")
         workflow.add_edge("verify", "persist_result")
+
         workflow.add_edge("persist_result", END)
         workflow.add_edge("persist_inconclusive", END)
 
@@ -95,12 +120,17 @@ class InvestigationService:
             investigation.status = InvestigationStatus.COMPLETED
             self.db.commit()
             self.db.refresh(investigation)
+
             return investigation
 
         except Exception:
             self.db.rollback()
 
-            investigation = self.db.get(Investigation, investigation_id)
+            investigation = self.db.get(
+                Investigation,
+                investigation_id,
+            )
+
             if investigation is not None:
                 investigation.status = InvestigationStatus.FAILED
                 self.db.commit()
@@ -120,43 +150,93 @@ class InvestigationService:
             return
 
         claim.status = ClaimStatus.INVESTIGATING
+
         self.graph.invoke({"claim": claim})
 
     def _retrieve_evidence(self, state: ClaimWorkflowState) -> dict:
         claim = state["claim"]
 
+        query = state.get("search_query", claim.text)
+
         retrieval_results = self.retriever.retrieve_hybrid(
             claim_id=claim.id,
-            query=claim.text,
+            query=query,
             as_of=claim.as_of,
             limit=10,
         )
 
         return {
-            "evidence": [item.evidence for item in retrieval_results]
+            "evidence": [
+                item.evidence
+                for item in retrieval_results
+            ]
+        }
+
+    def _rewrite_query(self, state: ClaimWorkflowState) -> dict:
+        claim = state["claim"]
+
+        rewritten_query = self.query_rewriter.rewrite(
+            claim.text
+        )
+
+        return {
+            "search_query": rewritten_query
         }
 
     @staticmethod
-    def _route_after_retrieval(state: ClaimWorkflowState) -> str:
-        return "analyze" if state.get("evidence") else "persist_inconclusive"
+    def _route_after_retrieval(
+        state: ClaimWorkflowState,
+    ) -> str:
+        return (
+            "analyze"
+            if state.get("evidence")
+            else "rewrite_query"
+        )
+
+    @staticmethod
+    def _route_after_retry(
+        state: ClaimWorkflowState,
+    ) -> str:
+        return (
+            "analyze"
+            if state.get("evidence")
+            else "persist_inconclusive"
+        )
 
     def _analyze_evidence(self, state: ClaimWorkflowState) -> dict:
         claim = state["claim"]
+
         analysis = self.analysis_service.analyze(
             state["evidence"],
             as_of=claim.as_of,
         )
+
         return {"analysis": analysis}
 
     def _verify_claim(self, state: ClaimWorkflowState) -> dict:
-        decision = self.verifier.verify(
-            claim=state["claim"],
-            evidence=state["evidence"],
+        verify_with_analysis = getattr(
+            self.verifier,
+            "verify_with_analysis",
+            None,
         )
+
+        if callable(verify_with_analysis):
+            decision = verify_with_analysis(
+                claim=state["claim"],
+                evidence=state["evidence"],
+                analysis=state["analysis"],
+            )
+        else:
+            decision = self.verifier.verify(
+                claim=state["claim"],
+                evidence=state["evidence"],
+            )
+
         decision = VerificationValidator.validate(
             decision=decision,
             evidence=state["evidence"],
         )
+
         return {"decision": decision}
 
     def _persist_result(self, state: ClaimWorkflowState) -> dict:
@@ -171,12 +251,17 @@ class InvestigationService:
             explanation=decision.explanation,
             confidence=decision.confidence,
         )
+
         self.db.add(result)
         self.db.flush()
 
-        self._persist_analysis(result=result, analysis=analysis)
+        self._persist_analysis(
+            result=result,
+            analysis=analysis,
+        )
 
         cited_evidence_ids = set(decision.evidence_ids)
+
         for evidence_item in evidence:
             if evidence_item.id in cited_evidence_ids:
                 self.db.add(
@@ -187,6 +272,7 @@ class InvestigationService:
                 )
 
         claim.status = ClaimStatus.COMPLETED
+
         return {"result": result}
 
     def _persist_inconclusive(self, state: ClaimWorkflowState) -> dict:
@@ -196,13 +282,15 @@ class InvestigationService:
             claim_id=claim.id,
             verdict="inconclusive",
             explanation=(
-                "No relevant evidence is available for "
-                "this claim at the specified point in time."
+                "No relevant evidence was found after the initial "
+                "retrieval and one reformulated retrieval attempt."
             ),
             confidence=0.0,
         )
+
         self.db.add(result)
         claim.status = ClaimStatus.COMPLETED
+
         return {"result": result}
 
     def _persist_analysis(
@@ -212,6 +300,7 @@ class InvestigationService:
     ) -> None:
         for evidence_analysis in analysis.evidence_analysis:
             quality = evidence_analysis.quality
+
             self.db.add(
                 EvidenceAnalysis(
                     result_id=result.id,

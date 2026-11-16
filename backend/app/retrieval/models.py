@@ -13,3 +13,4 @@ class RetrievalResult:
     raw_score: float | None = None
     vector_score: float | None = None
     lexical_score: float | None = None
+    rerank_score: float | None = None
