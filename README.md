@@ -2,103 +2,155 @@
 
 **An evidence-driven AI investigation engine for claim verification, temporal reasoning, and traceable conclusions.**
 
-TraceLedger is an AI-powered investigation platform designed to evaluate claims against available evidence, assess source reliability, identify conflicting information, and explain how conclusions are reached.
+TraceLedger is an AI-powered investigation platform designed to evaluate claims against available evidence, assess source reliability, identify conflicting information, and generate explainable conclusions.
 
-Unlike conventional RAG-based question-answering systems, TraceLedger focuses on the reliability and traceability of the investigation process. It combines hybrid information retrieval, evidence-quality assessment, temporal filtering, and structured LLM-based verification to support evidence-grounded analysis.
+Unlike conventional RAG-based question-answering systems, TraceLedger combines hybrid retrieval, evidence-quality assessment, temporal filtering, and structured LLM-based verification to make investigation results more reliable, transparent, and auditable.
 
-> **Development status:** Actively under development. Core backend investigation workflows, retrieval, evidence-quality assessment, persistence, and automated testing are implemented. Frontend integration and advanced verification capabilities continue to evolve.
+> **Development Status:** TraceLedger is actively under development. Core backend workflows, retrieval, evidence-quality assessment, persistence, and automated tests have been implemented. Frontend integration and advanced verification capabilities are evolving.
+
+---
+
+## Application Preview
+
+### Dashboard
+
+![TraceLedger Dashboard](docs/screenshots/dashboard.jpg)
+
+### Investigations
+
+![TraceLedger Investigations](docs/screenshots/investigations.jpg)
+
+### Create Investigation
+
+![TraceLedger Create Investigation](docs/screenshots/create-investigation.png)
+
+### Create Claim
+
+![TraceLedger Create Claim](docs/screenshots/create-claim.png)
+
+---
 
 ## Key Capabilities
 
-### Investigation Management
-- Create and manage investigations containing multiple claims.
-- Execute structured investigation workflows.
-- Track investigation lifecycle states, including running, completed, and failed.
-- Persist investigation results and analysis.
+### 1. Investigation Management
 
-### Hybrid Evidence Retrieval
-- Semantic retrieval using vector embeddings.
-- Lexical retrieval for keyword-oriented evidence discovery.
-- Reciprocal Rank Fusion (RRF) for combining retrieval results.
-- PostgreSQL and pgvector-based retrieval infrastructure.
-- Temporal filtering to exclude evidence unavailable at the investigation's reference time.
+- Create and manage investigations.
+- Organize claims and supporting evidence.
+- Track investigation execution and lifecycle.
+- Persist investigation results for future inspection.
 
-### Evidence Quality Assessment
-Evaluate retrieved evidence across four dimensions:
+### 2. Hybrid Evidence Retrieval
 
-- **Authority:** Assess source credibility and authority.
-- **Freshness:** Evaluate how recently evidence was observed or published.
-- **Temporal validity:** Determine whether evidence was available at the investigation's reference time.
-- **Completeness:** Assess the availability of meaningful source information.
+- Combines semantic and lexical retrieval approaches.
+- Retrieves relevant evidence for submitted claims.
+- Uses ranking and relevance-based retrieval to improve evidence discovery.
 
-### AI-Powered Verification
-- Google Gemini integration for LLM-based verification.
-- Structured investigation and analysis workflows.
-- LangGraph-based orchestration.
-- Evidence-grounded claim analysis.
+### 3. Evidence Quality Assessment
 
-### Traceability and Persistence
-- Associate claims with supporting evidence.
-- Persist structured investigation results.
-- Maintain evidence-to-result citation relationships.
-- Store investigation analysis and evidence-quality assessments.
+Evaluates retrieved evidence across multiple dimensions:
 
-### Backend Reliability
-- PostgreSQL transaction management.
-- Row-level locking for concurrent investigation execution.
-- Protection against duplicate result persistence.
-- Investigation execution lifecycle tracking.
-- Automated unit, API, and integration testing.
+- **Authority:** Reliability and credibility of the source.
+- **Freshness:** How recently the information was published or updated.
+- **Temporal Validity:** Whether the evidence is relevant to the investigation's time context.
+- **Completeness:** Whether the available content provides sufficient information.
 
-*Advanced contradiction handling, comprehensive evaluation, and complete end-to-end integration remain active development areas.*
+### 4. AI-Powered Verification
+
+- Uses Google Gemini for LLM-based analysis.
+- Uses LangGraph to orchestrate structured investigation workflows.
+- Processes claims against retrieved evidence.
+- Generates structured verification results.
+
+### 5. Traceability and Persistence
+
+- Maintains relationships between investigations, claims, and evidence.
+- Persists investigation results and supporting information.
+- Supports traceable, evidence-grounded conclusions.
+
+### 6. Backend Reliability
+
+- Database transactions for consistent persistence.
+- PostgreSQL row-level locking for concurrency control.
+- Duplicate persistence protection.
+- Investigation lifecycle management.
+- Automated unit and integration testing.
+
+> Advanced contradiction handling, comprehensive evaluation, and complete end-to-end integration remain active development areas.
+
+---
 
 ## Architecture
 
 ```text
-                         TraceLedger
-                              |
-             +----------------+----------------+
-             |                                 |
-         Frontend                         Backend API
-      Next.js / React                      FastAPI
-             |                                 |
-             |                      Investigation Workflow
-             |                          LangGraph
-             |                                 |
-             |                +----------------+----------------+
-             |                |                |                |
-             |           Retrieval       Verification       Analysis
-             |                |                |                |
-             |          Hybrid Search     Google Gemini    Evidence Quality
-             |                |                |                |
-             |                +----------------+----------------+
-             |                                 |
-             |                           Persistence
-             |                                 |
-             |                         PostgreSQL
-             |                            pgvector
-             |                                 |
-             +------------------------- Investigation Results
-                                               |
-                                      Claims / Evidence /
-                                      Analysis / Citations
+                  ┌──────────────────────────┐
+                  │       Next.js UI         │
+                  │     React + TypeScript   │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │       FastAPI API        │
+                  │     REST Endpoints       │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │   Investigation Service  │
+                  │                          │
+                  │  Claim Processing        │
+                  │  Workflow Coordination  │
+                  │  Result Persistence      │
+                  └────────────┬─────────────┘
+                               │
+                               ▼
+                  ┌──────────────────────────┐
+                  │    LangGraph Workflow    │
+                  │                          │
+                  │  Evidence Retrieval      │
+                  │  Evidence Assessment     │
+                  │  LLM Verification        │
+                  │  Result Generation       │
+                  └────────────┬─────────────┘
+                               │
+                  ┌────────────┴─────────────┐
+                  ▼                          ▼
+       ┌────────────────────┐     ┌────────────────────┐
+       │  Hybrid Retrieval  │     │   Google Gemini    │
+       │                    │     │                    │
+       │  Dense Retrieval   │     │  LLM Analysis      │
+       │  Lexical Retrieval │     │  Structured Output │
+       │  Ranking           │     │                    │
+       └──────────┬─────────┘     └────────────────────┘
+                  │
+                  ▼
+       ┌────────────────────────┐
+       │      PostgreSQL        │
+       │                        │
+       │  Application Data      │
+       │  Evidence Records      │
+       │  Investigation Results │
+       │  pgvector              │
+       └────────────────────────┘
 ```
+
+---
 
 ## Technology Stack
 
-| Component | Technologies |
+| Layer | Technologies |
 |---|---|
 | Frontend | Next.js, React, TypeScript, Tailwind CSS |
 | Backend | Python, FastAPI |
 | AI Orchestration | LangGraph, LangChain |
-| LLM Integration | Google Gemini |
-| Retrieval | Hybrid Search, Dense Retrieval, Lexical Retrieval, RRF |
-| Database | PostgreSQL, SQLAlchemy |
-| Vector Storage | pgvector |
+| LLM | Google Gemini |
+| Retrieval | Hybrid Search, Dense Retrieval, Lexical Retrieval, Reciprocal Rank Fusion |
+| Database | PostgreSQL, SQLAlchemy, pgvector |
 | Data Validation | Pydantic |
-| Database Migrations | Alembic |
-| Testing | pytest |
+| Migrations | Alembic |
+| Testing | Pytest, Unit Testing, Integration Testing |
 | Code Quality | ESLint, TypeScript |
+
+---
 
 ## Project Structure
 
@@ -123,25 +175,37 @@ TraceLedger/
 ├── frontend/
 │   ├── app/
 │   ├── components/
-│   └── lib/
+│   ├── lib/
+│   └── public/
 │
 ├── docs/
+│   └── screenshots/
+│       ├── dashboard.jpg
+│       ├── investigations.jpg
+│       ├── create-investigation.png
+│       └── create-claim.png
+│
 ├── evaluation/
 ├── infrastructure/
 │
-└── README.md
+├── README.md
+└── ...
 ```
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
+Make sure the following tools are installed:
+
 - Python 3.12
 - Node.js and npm
-- PostgreSQL with pgvector support
+- PostgreSQL with pgvector extension
 - Google Gemini API credentials
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/anshpandey003/TraceLedger.git
@@ -156,130 +220,115 @@ Create and activate a virtual environment:
 python -m venv .venv
 ```
 
-Linux / WSL:
-
-```bash
-source .venv/bin/activate
-```
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
 Install backend dependencies:
 
 ```bash
-python -m pip install -e ./backend
+pip install -e ./backend
 ```
 
-Configure the required environment variables, including database connection details and Gemini API credentials, according to the backend configuration.
+Configure the required environment variables, including database connection details and Gemini API credentials.
 
-Apply database migrations:
+Run database migrations:
 
 ```bash
 alembic upgrade head
 ```
 
-Start the backend:
+Start the FastAPI server:
 
 ```bash
-python -m uvicorn backend.app.main:app --reload
+uvicorn app.main:app --reload
 ```
-
-The API is available at:
-
-`http://127.0.0.1:8000`
-
-Interactive API documentation:
-
-`http://127.0.0.1:8000/docs`
 
 ### 3. Frontend Setup
 
-Open a separate terminal:
+Navigate to the frontend directory:
 
 ```bash
 cd frontend
+```
+
+Install dependencies:
+
+```bash
 npm install
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
 
-The frontend is available at:
+The frontend will be available at:
 
-`http://localhost:3000`
-
-### 4. Running Backend Tests
-
-From the repository root, with the backend virtual environment activated:
-
-```bash
-PYTHONPATH=.:backend pytest backend/tests/ -q
+```text
+http://localhost:3000
 ```
 
-The test suite includes coverage for:
+### 4. Run Tests
 
-- API workflows.
-- Evidence retrieval and temporal filtering.
-- Evidence-quality assessment.
-- LLM verification.
-- Investigation analysis.
-- Database persistence.
-- Retry behavior.
-- Concurrent execution and transaction locking.
+From the backend environment:
+
+```bash
+pytest
+```
 
 ### 5. Frontend Validation
-
-From the frontend directory:
 
 ```bash
 npm run lint
 npm run build
 ```
 
+---
+
 ## Engineering Principles
 
-- **Evidence before conclusions:** Ground verification in retrieved evidence.
-- **Traceability:** Preserve relationships between claims, evidence, analysis, and citations.
-- **Temporal awareness:** Evaluate information against the investigation's reference time.
-- **Uncertainty awareness:** Avoid treating insufficient evidence as proof.
-- **Transparency:** Make the reasoning and supporting evidence inspectable.
-- **Reliability:** Protect investigation execution and persistence against concurrency issues.
-- **Modularity:** Separate retrieval, verification, analysis, APIs, and persistence.
-- **Testability:** Validate critical application behavior through automated tests.
+TraceLedger is built around the following engineering principles:
 
-## Development Roadmap
-
-TraceLedger is actively evolving. Current and planned areas of development include:
-
-- [x] Investigation and claim management.
-- [x] Evidence persistence and retrieval.
-- [x] Evidence-quality assessment.
-- [x] Temporal evidence filtering.
-- [x] Dense and lexical retrieval foundations.
-- [x] Reciprocal Rank Fusion.
-- [x] LangGraph-based investigation orchestration.
-- [x] Gemini-based verification components.
-- [x] Investigation persistence and concurrency protection.
-- [x] Backend API and integration test coverage.
-- [ ] Advanced contradiction detection and resolution.
-- [ ] Comprehensive retrieval and verification evaluation.
-- [ ] Complete frontend/backend end-to-end validation.
-- [ ] Improved failure recovery and stale-execution handling.
-- [ ] Security hardening and deployment.
-- [ ] Performance benchmarking.
-
-## Contributing
-
-Bug reports, ideas, and contributions are welcome.
-
-Please keep changes focused, test modifications before submitting them, and never commit credentials, environment files, or generated artifacts.
-
-## License
-
-No license has been specified yet. Reuse and redistribution remain subject to applicable copyright law until a license is added.
+- **Evidence First:** Conclusions should be grounded in retrieved and inspectable evidence.
+- **Traceability:** Important conclusions should be connected to their supporting evidence.
+- **Temporal Awareness:** Evidence must be evaluated in the context of the investigation's relevant time.
+- **Separation of Concerns:** Retrieval, evidence assessment, verification, and persistence should remain independently manageable.
+- **Deterministic Reliability:** Database consistency, validation, and execution safeguards should not depend solely on LLM behavior.
+- **Testability:** Core workflows should be covered by automated tests.
 
 ---
 
-**TraceLedger — Investigate the evidence. Explain the contradictions. Make conclusions traceable.**
+## Development Roadmap
+
+- [x] Backend application foundation
+- [x] Investigation and claim management
+- [x] Database models and persistence
+- [x] Evidence retrieval foundation
+- [x] Hybrid retrieval implementation
+- [x] Evidence-quality assessment
+- [x] Gemini integration
+- [x] LangGraph workflow foundation
+- [x] Backend unit and integration testing
+- [ ] Advanced contradiction detection and handling
+- [ ] Comprehensive evaluation framework
+- [ ] Complete frontend/backend end-to-end integration
+- [ ] Failure recovery and execution lifecycle improvements
+- [ ] Security hardening
+- [ ] Performance evaluation and optimization
+- [ ] Deployment and production readiness
+
+---
+
+## Contributing
+
+TraceLedger is currently under active development.
+
+Suggestions, bug reports, and contributions are welcome. Feel free to open an issue or submit a pull request.
+
+---
+
+## License
+
+No open-source license has been specified yet.
+
+---
+
+**TraceLedger — Making AI-driven investigations evidence-based, time-aware, and traceable.**
